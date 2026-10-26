@@ -58,20 +58,20 @@ t2 = TimelineItem("1998", "iMac", "iMac is a family of all-in-one Mac desktop co
   ],
 });
 
-const LLM_BASE_URL = "http://localhost:1235/v1";
-const LLM_MODEL_ID = "google/gemma-4-e2b";
-
-const llm = createOpenAICompatible({
-  name: "llm",
-  baseURL: LLM_BASE_URL,
-});
+import type { AppSettings } from "./settings";
 
 export async function streamLocalUI(
   userPrompt: string,
   onChunk: (openUiCodeSoFar: string) => void,
+  settings: Pick<AppSettings, "apiUrl" | "modelId">,
 ) {
+  const llm = createOpenAICompatible({
+    name: "llm",
+    baseURL: settings.apiUrl,
+  });
+
   const { textStream } = streamText({
-    model: llm(LLM_MODEL_ID),
+    model: llm(settings.modelId),
     system: SYSTEM_PROMPT,
     prompt: userPrompt,
     temperature: 0.1,
