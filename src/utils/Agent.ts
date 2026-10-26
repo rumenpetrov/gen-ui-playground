@@ -38,7 +38,7 @@ export const SYSTEM_PROMPT = uiLibrary.prompt({
     "TableHead only contains TableRow which contains TableHeader children.",
     "TableBody only contains TableRow which contains TableCell children.",
     "TableRow has 1 or multiple children.",
-    "TableCell recieves only 1 argument. Never more than tihs.",
+    "TableCell receives only 1 argument. Never more than this.",
     "NEVER put TimelineItem directly inside Layout; always wrap TimelineItem items inside Timeline([...]).",
   ],
   examples: [
@@ -49,7 +49,7 @@ s2 = Stat("4GLD", "-3%", "Down")
 table = Table([thead, tbody])
 thead = TableHead([headrow1])
 headrow1 = TableRow([TableHeader("Ticker"), TableHeader("Change")])
-tbody = TableBody([bodyrow, bodyrow2])
+tbody = TableBody([bodyrow1, bodyrow2])
 bodyrow1 = TableRow([TableCell("VWCE"), TableCell("+2.12%")])
 bodyrow2 = TableRow([TableCell("4GLD"), TableCell("-3.00%")])
 timeline = Timeline([t1, t2])
