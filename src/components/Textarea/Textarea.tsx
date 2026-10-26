@@ -1,4 +1,6 @@
-export const Texarea = (props) => {
+import type { TextareaHTMLAttributes } from "react";
+
+export const Texarea = (props: TextareaHTMLAttributes<HTMLTextAreaElement>) => {
   const { children, ...rest } = props;
 
   return (

@@ -1,4 +1,6 @@
-export const Button = (props) => {
+import type { ButtonHTMLAttributes } from "react";
+
+export const Button = (props: ButtonHTMLAttributes<HTMLButtonElement>) => {
   const { children, ...rest } = props;
 
   return (

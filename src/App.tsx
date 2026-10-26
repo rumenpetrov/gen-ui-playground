@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { type SubmitEvent, useState } from "react";
 import { Renderer } from "@openuidev/react-lang";
 import Button from "./components/Button";
 import Textarea from "./components/Textarea";
@@ -17,7 +17,7 @@ function App() {
   const [prompt, setPrompt] = useState("");
   const [streaming, setStreaming] = useState(false);
 
-  const handleGenerate = async (e) => {
+  const handleGenerate = async (e: SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     setStreaming(true);
