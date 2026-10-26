@@ -12,12 +12,36 @@ import {
 } from "./utils/settings";
 
 const promptList = [
-  "Show me key performance stats for the top 5 companies in S&P 500.",
-  "A timeline with the last 5 presidents of France.",
-  "Display server health stats and a table of recent incidents.",
-  "Show me a dashboard of website traffic metrics and top referral sources.",
-  "I want to see a comparison table of the 5 largest planets in our solar system.",
-  "Show me a production outage report with impact stats, a timeline of events during the incident, and a table of affected services.",
+  {
+    label: "Solar System Stats",
+    prompt:
+      "Show 4 stats about our solar system (Planets, Moons, Age, Star Type).",
+  },
+  {
+    label: "Apollo Timeline",
+    prompt:
+      "Show a timeline of the first 4 Apollo moon missions with year, mission name, and summary.",
+  },
+  {
+    label: "Server Health",
+    prompt:
+      "Display 3 sample server health stats (CPU, Memory, Uptime) and a table of 3 mock incidents with Service, Severity, and Status columns.",
+  },
+  {
+    label: "Traffic Dashboard",
+    prompt:
+      "Show 3 sample website traffic stats (Visitors, Bounce Rate, Avg Duration) and a table of top 4 referral sources with Source and Visits columns.",
+  },
+  {
+    label: "Largest Planets",
+    prompt:
+      "Show a comparison table of the 5 largest planets in our solar system with Planet, Diameter, and Moons columns.",
+  },
+  {
+    label: "Outage Report",
+    prompt:
+      "Show a sample production outage report with 3 impact stats, a 3-step timeline of events, and a table of 3 affected services.",
+  },
 ];
 
 function App() {
@@ -85,13 +109,13 @@ function App() {
             <div className="flex flex-wrap gap-2 overflow-auto">
               {promptList.map((suggestion) => (
                 <button
-                  key={suggestion}
+                  key={suggestion.label}
                   type="button"
                   className="btn btn-xs bg-base-100 border-base-content/20 hover:bg-base-300"
-                  onClick={() => setPrompt(suggestion)}
+                  onClick={() => setPrompt(suggestion.prompt)}
                   disabled={streaming}
                 >
-                  {suggestion}
+                  {suggestion.label}
                 </button>
               ))}
             </div>
