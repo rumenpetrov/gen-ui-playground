@@ -6,6 +6,7 @@ import {
   API_URL_PLACEHOLDER,
   type AppSettings,
   MODEL_ID_PLACEHOLDER,
+  validateSettings,
 } from "../../utils/settings";
 
 interface SettingsDrawerProps {
@@ -26,19 +27,46 @@ const SettingsForm = ({
   );
   const [apiUrl, setApiUrl] = useState(settings.apiUrl);
   const [modelId, setModelId] = useState(settings.modelId);
+  const [validating, setValidating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: SubmitEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
-    onSave({
+    if (validating) {
+      return;
+    }
+
+    const nextSettings: AppSettings = {
       providerType,
-      apiUrl: apiUrl.trim(),
+      apiUrl: apiUrl.trim().replace(/\/+$/, ""),
       modelId: modelId.trim(),
-    });
-    onClose();
+    };
+
+    setValidating(true);
+    setError(null);
+
+    try {
+      const validation = await validateSettings(nextSettings);
+      if (!validation.valid) {
+        setError(validation.error);
+        return;
+      }
+
+      onSave(nextSettings);
+      onClose();
+    } finally {
+      setValidating(false);
+    }
   };
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      {error ? (
+        <div role="alert" className="alert alert-error text-sm">
+          <span>{error}</span>
+        </div>
+      ) : null}
+
       <fieldset className="fieldset">
         <legend className="fieldset-legend">API Provider</legend>
         <Select
@@ -64,7 +92,13 @@ const SettingsForm = ({
           type="url"
           placeholder={API_URL_PLACEHOLDER}
           value={apiUrl}
-          onChange={(e) => setApiUrl(e.target.value)}
+          onChange={(e) => {
+            setApiUrl(e.target.value);
+            if (error) {
+              setError(null);
+            }
+          }}
+          disabled={validating}
           required
         />
         <p className="label text-xs opacity-70">We suggest LM Studio Bionic</p>
@@ -77,13 +111,21 @@ const SettingsForm = ({
           type="text"
           placeholder={MODEL_ID_PLACEHOLDER}
           value={modelId}
-          onChange={(e) => setModelId(e.target.value)}
+          onChange={(e) => {
+            setModelId(e.target.value);
+            if (error) {
+              setError(null);
+            }
+          }}
+          disabled={validating}
           required
         />
       </fieldset>
 
       <div className="mt-2 flex flex-col">
-        <Button type="submit">Save</Button>
+        <Button type="submit" disabled={validating}>
+          {validating ? "Validating..." : "Save"}
+        </Button>
       </div>
     </form>
   );

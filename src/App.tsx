@@ -48,6 +48,7 @@ function App() {
   const [code, setCode] = useState("");
   const [prompt, setPrompt] = useState("");
   const [streaming, setStreaming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState<AppSettings>(() => loadSettings());
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
@@ -56,6 +57,7 @@ function App() {
   const handleSaveSettings = (nextSettings: AppSettings) => {
     saveSettings(nextSettings);
     setSettings(nextSettings);
+    setError(null);
   };
 
   const handleGenerate = async (e: SubmitEvent<HTMLFormElement>) => {
@@ -66,9 +68,16 @@ function App() {
 
     setStreaming(true);
     setCode("");
+    setError(null);
 
     try {
       await streamLocalUI(prompt, setCode, settings);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "An unexpected error occurred while generating the UI.",
+      );
     } finally {
       setStreaming(false);
     }
@@ -95,6 +104,18 @@ function App() {
       {configured ? (
         <>
           <main className="flex-1 overflow-auto p-4">
+            {error ? (
+              <div role="alert" className="alert alert-error mb-4">
+                <span>{error}</span>
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={() => setIsSettingsOpen(true)}
+                >
+                  Check Settings
+                </button>
+              </div>
+            ) : null}
             <Renderer
               library={uiLibrary}
               response={code}

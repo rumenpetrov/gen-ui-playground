@@ -58,28 +58,61 @@ t2 = TimelineItem("1998", "iMac", "iMac is a family of all-in-one Mac desktop co
   ],
 });
 
-import type { AppSettings } from "./settings";
+import {
+  type AppSettings,
+  validateSettings,
+} from "./settings";
+
+function extractErrorMessage(err: unknown): string {
+  if (err instanceof Error && err.message) {
+    return err.message;
+  }
+  if (
+    typeof err === "object" &&
+    err !== null &&
+    "error" in err &&
+    err.error instanceof Error &&
+    err.error.message
+  ) {
+    return err.error.message;
+  }
+  return "Failed to generate UI from the LLM.";
+}
 
 export async function streamLocalUI(
   userPrompt: string,
   onChunk: (openUiCodeSoFar: string) => void,
   settings: Pick<AppSettings, "apiUrl" | "modelId">,
 ) {
+  const validation = await validateSettings(settings);
+  if (!validation.valid) {
+    throw new Error(validation.error);
+  }
+
   const llm = createOpenAICompatible({
     name: "llm",
     baseURL: settings.apiUrl,
   });
+
+  let streamError: unknown = null;
 
   const { textStream } = streamText({
     model: llm(settings.modelId),
     system: SYSTEM_PROMPT,
     prompt: userPrompt,
     temperature: 0.1,
+    onError: ({ error }) => {
+      streamError = error;
+    },
   });
 
   let buffer = "";
   for await (const delta of textStream) {
     buffer += delta;
     onChunk(buffer);
+  }
+
+  if (streamError) {
+    throw new Error(extractErrorMessage(streamError));
   }
 }
