@@ -1,19 +1,48 @@
-export interface AppSettings {
-  providerType: "openai-compatible" | "cloud";
+export type ProviderType = "openai-compatible" | "google";
+
+export interface OpenAICompatibleSettings {
   apiUrl: string;
   modelId: string;
 }
 
+export interface GoogleSettings {
+  apiKey: string;
+  modelId: string;
+}
+
+export interface AppSettings {
+  providerType: ProviderType;
+  openaiCompatible: OpenAICompatibleSettings;
+  google: GoogleSettings;
+}
+
+interface StoredSettings extends Partial<AppSettings> {
+  apiUrl?: unknown;
+  modelId?: unknown;
+}
+
 const STORAGE_KEY = "gen-ui-playground:settings";
+const GOOGLE_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 
 export const API_URL_PLACEHOLDER = "http://localhost:1235/v1";
 export const MODEL_ID_PLACEHOLDER = "google/gemma-4-e2b";
+export const GOOGLE_MODEL_ID_PLACEHOLDER = "gemini-2.5-flash";
 
 export const DEFAULT_SETTINGS: AppSettings = {
   providerType: "openai-compatible",
-  apiUrl: "",
-  modelId: "",
+  openaiCompatible: {
+    apiUrl: "",
+    modelId: "",
+  },
+  google: {
+    apiKey: "",
+    modelId: "",
+  },
 };
+
+export function normalizeGoogleModelId(modelId: string): string {
+  return modelId.trim().replace(/^models\//, "");
+}
 
 export function loadSettings(): AppSettings {
   try {
@@ -22,12 +51,32 @@ export function loadSettings(): AppSettings {
       return DEFAULT_SETTINGS;
     }
 
-    const parsed = JSON.parse(raw) as Partial<AppSettings>;
+    const parsed = JSON.parse(raw) as StoredSettings;
+    const legacyApiUrl = typeof parsed.apiUrl === "string" ? parsed.apiUrl : "";
+    const legacyModelId =
+      typeof parsed.modelId === "string" ? parsed.modelId : "";
+
     return {
       providerType:
-        parsed.providerType === "cloud" ? "cloud" : "openai-compatible",
-      apiUrl: typeof parsed.apiUrl === "string" ? parsed.apiUrl : "",
-      modelId: typeof parsed.modelId === "string" ? parsed.modelId : "",
+        parsed.providerType === "google" ? "google" : "openai-compatible",
+      openaiCompatible: {
+        apiUrl:
+          typeof parsed.openaiCompatible?.apiUrl === "string"
+            ? parsed.openaiCompatible.apiUrl
+            : legacyApiUrl,
+        modelId:
+          typeof parsed.openaiCompatible?.modelId === "string"
+            ? parsed.openaiCompatible.modelId
+            : legacyModelId,
+      },
+      google: {
+        apiKey:
+          typeof parsed.google?.apiKey === "string" ? parsed.google.apiKey : "",
+        modelId:
+          typeof parsed.google?.modelId === "string"
+            ? parsed.google.modelId
+            : "",
+      },
     };
   } catch {
     return DEFAULT_SETTINGS;
@@ -39,7 +88,17 @@ export function saveSettings(settings: AppSettings): void {
 }
 
 export function isSettingsConfigured(settings: AppSettings): boolean {
-  return Boolean(settings.apiUrl.trim() && settings.modelId.trim());
+  if (settings.providerType === "google") {
+    return Boolean(
+      settings.google.apiKey.trim() &&
+        normalizeGoogleModelId(settings.google.modelId),
+    );
+  }
+
+  return Boolean(
+    settings.openaiCompatible.apiUrl.trim() &&
+      settings.openaiCompatible.modelId.trim(),
+  );
 }
 
 interface ModelsResponse {
@@ -48,8 +107,21 @@ interface ModelsResponse {
   }>;
 }
 
-export async function validateSettings(
-  settings: Pick<AppSettings, "apiUrl" | "modelId">,
+interface GoogleModelMetadata {
+  name?: string;
+  supportedGenerationMethods?: string[];
+}
+
+interface GoogleErrorResponse {
+  error?: {
+    code?: number;
+    message?: string;
+    status?: string;
+  };
+}
+
+async function validateOpenAICompatibleSettings(
+  settings: OpenAICompatibleSettings,
 ): Promise<{ valid: true } | { valid: false; error: string }> {
   const cleanUrl = settings.apiUrl.trim().replace(/\/+$/, "");
   const cleanModelId = settings.modelId.trim();
@@ -119,4 +191,110 @@ export async function validateSettings(
   }
 
   return { valid: true };
+}
+
+async function validateGoogleSettings(
+  settings: GoogleSettings,
+): Promise<{ valid: true } | { valid: false; error: string }> {
+  const cleanApiKey = settings.apiKey.trim();
+  const cleanModelId = normalizeGoogleModelId(settings.modelId);
+
+  if (!cleanApiKey || !cleanModelId) {
+    return {
+      valid: false,
+      error: "Both API Key and Model ID are required.",
+    };
+  }
+
+  const modelPath = cleanModelId.includes("/")
+    ? cleanModelId.split("/").map(encodeURIComponent).join("/")
+    : `models/${encodeURIComponent(cleanModelId)}`;
+
+  let response: Response;
+  try {
+    response = await fetch(`${GOOGLE_API_BASE_URL}/${modelPath}`, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        "x-goog-api-key": cleanApiKey,
+      },
+    });
+  } catch {
+    return {
+      valid: false,
+      error:
+        "Could not connect to the Google Gemini API. Check your internet connection and try again.",
+    };
+  }
+
+  if (!response.ok) {
+    let apiMessage: string | undefined;
+    try {
+      const errorBody = (await response.json()) as GoogleErrorResponse;
+      apiMessage = errorBody.error?.message;
+    } catch {
+      // Ignore JSON parsing errors on non-OK responses
+    }
+
+    if (response.status === 404) {
+      return {
+        valid: false,
+        error:
+          apiMessage ||
+          `Model "${cleanModelId}" was not found on the Google Gemini API. Check the Model ID (e.g. ${GOOGLE_MODEL_ID_PLACEHOLDER}).`,
+      };
+    }
+
+    if (
+      response.status === 400 ||
+      response.status === 401 ||
+      response.status === 403
+    ) {
+      return {
+        valid: false,
+        error:
+          apiMessage ||
+          "Invalid or unauthorized Google API key. Check your key from Google AI Studio.",
+      };
+    }
+
+    return {
+      valid: false,
+      error:
+        apiMessage ||
+        `Google Gemini API responded with status ${response.status} (${response.statusText}).`,
+    };
+  }
+
+  let body: GoogleModelMetadata;
+  try {
+    body = (await response.json()) as GoogleModelMetadata;
+  } catch {
+    return {
+      valid: false,
+      error: "Invalid JSON response from the Google Gemini API.",
+    };
+  }
+
+  if (
+    Array.isArray(body.supportedGenerationMethods) &&
+    !body.supportedGenerationMethods.includes("generateContent")
+  ) {
+    return {
+      valid: false,
+      error: `Model "${cleanModelId}" does not support content generation (generateContent). Try a generative model like ${GOOGLE_MODEL_ID_PLACEHOLDER}.`,
+    };
+  }
+
+  return { valid: true };
+}
+
+export async function validateSettings(
+  settings: AppSettings,
+): Promise<{ valid: true } | { valid: false; error: string }> {
+  if (settings.providerType === "google") {
+    return validateGoogleSettings(settings.google);
+  }
+
+  return validateOpenAICompatibleSettings(settings.openaiCompatible);
 }

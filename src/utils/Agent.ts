@@ -1,4 +1,5 @@
 import { streamText } from "ai";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { createLibrary } from "@openuidev/react-lang";
 import { LayoutOUID } from "../components/Layout";
@@ -12,6 +13,12 @@ import { TableHeaderOUID } from "../components/TableHeader";
 import { TableCellOUID } from "../components/TableCell";
 import { TimelineOUID } from "../components/Timeline";
 import { TimelineItemOUID } from "../components/TimelineItem";
+import {
+  type AppSettings,
+  isSettingsConfigured,
+  normalizeGoogleModelId,
+  validateSettings,
+} from "./settings";
 
 export const uiLibrary = createLibrary({
   root: "Layout",
@@ -58,11 +65,6 @@ t2 = TimelineItem("1998", "iMac", "iMac is a family of all-in-one Mac desktop co
   ],
 });
 
-import {
-  type AppSettings,
-  validateSettings,
-} from "./settings";
-
 function extractErrorMessage(err: unknown): string {
   if (err instanceof Error && err.message) {
     return err.message;
@@ -79,25 +81,39 @@ function extractErrorMessage(err: unknown): string {
   return "Failed to generate UI from the LLM.";
 }
 
-export async function streamLocalUI(
-  userPrompt: string,
-  onChunk: (openUiCodeSoFar: string) => void,
-  settings: Pick<AppSettings, "apiUrl" | "modelId">,
-) {
-  const validation = await validateSettings(settings);
-  if (!validation.valid) {
-    throw new Error(validation.error);
+function createModel(settings: AppSettings) {
+  if (settings.providerType === "google") {
+    const google = createGoogleGenerativeAI({
+      apiKey: settings.google.apiKey.trim(),
+    });
+    return google(normalizeGoogleModelId(settings.google.modelId));
   }
 
   const llm = createOpenAICompatible({
     name: "llm",
-    baseURL: settings.apiUrl,
+    baseURL: settings.openaiCompatible.apiUrl.trim().replace(/\/+$/, ""),
   });
+  return llm(settings.openaiCompatible.modelId.trim());
+}
+
+export async function streamUI(
+  userPrompt: string,
+  onChunk: (openUiCodeSoFar: string) => void,
+  settings: AppSettings,
+) {
+  if (settings.providerType === "openai-compatible") {
+    const validation = await validateSettings(settings);
+    if (!validation.valid) {
+      throw new Error(validation.error);
+    }
+  } else if (!isSettingsConfigured(settings)) {
+    throw new Error("Both API Key and Model ID are required.");
+  }
 
   let streamError: unknown = null;
 
   const { textStream } = streamText({
-    model: llm(settings.modelId),
+    model: createModel(settings),
     system: SYSTEM_PROMPT,
     prompt: userPrompt,
     temperature: 0.1,

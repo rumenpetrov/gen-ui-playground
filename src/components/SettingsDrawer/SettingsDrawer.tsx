@@ -5,7 +5,9 @@ import Select from "../Select";
 import {
   API_URL_PLACEHOLDER,
   type AppSettings,
+  GOOGLE_MODEL_ID_PLACEHOLDER,
   MODEL_ID_PLACEHOLDER,
+  normalizeGoogleModelId,
   validateSettings,
 } from "../../utils/settings";
 
@@ -25,8 +27,15 @@ const SettingsForm = ({
   const [providerType, setProviderType] = useState<AppSettings["providerType"]>(
     settings.providerType,
   );
-  const [apiUrl, setApiUrl] = useState(settings.apiUrl);
-  const [modelId, setModelId] = useState(settings.modelId);
+  const [openaiApiUrl, setOpenaiApiUrl] = useState(
+    settings.openaiCompatible.apiUrl,
+  );
+  const [openaiModelId, setOpenaiModelId] = useState(
+    settings.openaiCompatible.modelId,
+  );
+  const [googleApiKey, setGoogleApiKey] = useState(settings.google.apiKey);
+  const [googleModelId, setGoogleModelId] = useState(settings.google.modelId);
+  const [showApiKey, setShowApiKey] = useState(false);
   const [validating, setValidating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,8 +47,14 @@ const SettingsForm = ({
 
     const nextSettings: AppSettings = {
       providerType,
-      apiUrl: apiUrl.trim().replace(/\/+$/, ""),
-      modelId: modelId.trim(),
+      openaiCompatible: {
+        apiUrl: openaiApiUrl.trim().replace(/\/+$/, ""),
+        modelId: openaiModelId.trim(),
+      },
+      google: {
+        apiKey: googleApiKey.trim(),
+        modelId: normalizeGoogleModelId(googleModelId),
+      },
     };
 
     setValidating(true);
@@ -72,55 +87,127 @@ const SettingsForm = ({
         <Select
           name="providerType"
           value={providerType}
-          onChange={(e) =>
-            setProviderType(e.target.value as AppSettings["providerType"])
-          }
-          disabled
+          onChange={(e) => {
+            setProviderType(e.target.value as AppSettings["providerType"]);
+            setShowApiKey(false);
+            if (error) {
+              setError(null);
+            }
+          }}
+          disabled={validating}
         >
-          <option value="openai-compatible">openai-compatible</option>
-          <option value="cloud">cloud</option>
+          <option value="openai-compatible">OpenAI-Compatible</option>
+          <option value="google">Google Gemini</option>
         </Select>
-        <p className="label text-xs opacity-70">
-          Cloud API is not supported yet.
-        </p>
       </fieldset>
 
-      <fieldset className="fieldset">
-        <legend className="fieldset-legend">API URL</legend>
-        <Input
-          name="apiUrl"
-          type="url"
-          placeholder={API_URL_PLACEHOLDER}
-          value={apiUrl}
-          onChange={(e) => {
-            setApiUrl(e.target.value);
-            if (error) {
-              setError(null);
-            }
-          }}
-          disabled={validating}
-          required
-        />
-        <p className="label text-xs opacity-70">We suggest LM Studio Bionic</p>
-      </fieldset>
+      {providerType === "openai-compatible" ? (
+        <>
+          <fieldset className="fieldset">
+            <legend className="fieldset-legend">API URL</legend>
+            <Input
+              name="apiUrl"
+              type="url"
+              placeholder={API_URL_PLACEHOLDER}
+              value={openaiApiUrl}
+              onChange={(e) => {
+                setOpenaiApiUrl(e.target.value);
+                if (error) {
+                  setError(null);
+                }
+              }}
+              disabled={validating}
+              required
+            />
+            <p className="label text-xs opacity-70">
+              We suggest LM Studio Bionic
+            </p>
+          </fieldset>
 
-      <fieldset className="fieldset">
-        <legend className="fieldset-legend">Model ID</legend>
-        <Input
-          name="modelId"
-          type="text"
-          placeholder={MODEL_ID_PLACEHOLDER}
-          value={modelId}
-          onChange={(e) => {
-            setModelId(e.target.value);
-            if (error) {
-              setError(null);
-            }
-          }}
-          disabled={validating}
-          required
-        />
-      </fieldset>
+          <fieldset className="fieldset">
+            <legend className="fieldset-legend">Model ID</legend>
+            <Input
+              name="modelId"
+              type="text"
+              placeholder={MODEL_ID_PLACEHOLDER}
+              value={openaiModelId}
+              onChange={(e) => {
+                setOpenaiModelId(e.target.value);
+                if (error) {
+                  setError(null);
+                }
+              }}
+              disabled={validating}
+              required
+            />
+          </fieldset>
+        </>
+      ) : (
+        <>
+          <fieldset className="fieldset">
+            <legend className="fieldset-legend">API Key</legend>
+            <div className="join w-full">
+              <Input
+                name="googleApiKey"
+                type={showApiKey ? "text" : "password"}
+                placeholder="AIza..."
+                value={googleApiKey}
+                onChange={(e) => {
+                  setGoogleApiKey(e.target.value);
+                  if (error) {
+                    setError(null);
+                  }
+                }}
+                className="join-item"
+                autoComplete="off"
+                disabled={validating}
+                required
+              />
+              <button
+                type="button"
+                className="btn join-item bg-base-100 border-base-content/20 hover:bg-base-300"
+                onClick={() => setShowApiKey((prev) => !prev)}
+                disabled={validating}
+                aria-label={showApiKey ? "Hide API key" : "Show API key"}
+              >
+                {showApiKey ? "Hide" : "Show"}
+              </button>
+            </div>
+            <p className="label text-xs opacity-70 whitespace-normal">
+              <span>
+                Get an API key from{" "}
+                <a
+                  href="https://aistudio.google.com/apikey"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="link"
+                >
+                  Google AI Studio
+                </a>
+                . Stored locally in your browser.
+              </span>
+            </p>
+          </fieldset>
+
+          <fieldset className="fieldset">
+            <legend className="fieldset-legend">Model ID</legend>
+            <Input
+              name="googleModelId"
+              type="text"
+              placeholder={GOOGLE_MODEL_ID_PLACEHOLDER}
+              value={googleModelId}
+              onChange={(e) => {
+                setGoogleModelId(e.target.value);
+                if (error) {
+                  setError(null);
+                }
+              }}
+              disabled={validating}
+              required
+            />
+          </fieldset>
+        </>
+      )}
 
       <div className="mt-2 flex flex-col">
         <Button type="submit" disabled={validating}>
@@ -174,7 +261,7 @@ export const SettingsDrawer = ({
           </div>
 
           <SettingsForm
-            key={`${isOpen}-${settings.providerType}-${settings.apiUrl}-${settings.modelId}`}
+            key={`${isOpen}-${JSON.stringify(settings)}`}
             settings={settings}
             onSave={onSave}
             onClose={onClose}

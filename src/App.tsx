@@ -3,7 +3,7 @@ import { Renderer } from "@openuidev/react-lang";
 import Button from "./components/Button";
 import SettingsDrawer from "./components/SettingsDrawer";
 import Textarea from "./components/Textarea";
-import { streamLocalUI, uiLibrary } from "./utils/Agent";
+import { streamUI, uiLibrary } from "./utils/Agent";
 import {
   type AppSettings,
   isSettingsConfigured,
@@ -71,7 +71,7 @@ function App() {
     setError(null);
 
     try {
-      await streamLocalUI(prompt, setCode, settings);
+      await streamUI(prompt, setCode, settings);
     } catch (err) {
       setError(
         err instanceof Error
@@ -158,8 +158,8 @@ function App() {
           <div className="max-w-md flex flex-col items-center gap-4">
             <h2 className="text-xl font-semibold">Configure LLM Settings</h2>
             <p className="text-base-content/70">
-              Please configure your API URL and Model ID in the settings before
-              using the app.
+              Please configure an LLM provider (OpenAI-Compatible or Google
+              Gemini) in the settings before using the app.
             </p>
             <Button type="button" onClick={() => setIsSettingsOpen(true)}>
               Open Settings
